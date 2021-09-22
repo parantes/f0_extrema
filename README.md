@@ -1,5 +1,7 @@
 # f0_extrema.praat
 
+[![DOI](https://zenodo.org/badge/199961157.svg)](https://zenodo.org/badge/latestdoi/199961157)
+
 A Praat script to find peaks and valleys in F0 contours.
 
 ## Purpose
@@ -29,4 +31,3 @@ See the [LICENSE](LICENSE.md) file for license rights and limitations.
 ## How to cite
 
 Click on the DOI badge above to see instructions on how to cite the script.
-
