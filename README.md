@@ -1,4 +1,4 @@
-# duration_suite.praat
+# f0_extrema.praat
 
 A Praat script to find peaks and valleys in F0 contours.
 
@@ -25,10 +25,8 @@ See the [CHANGELOG](CHANGELOG.md) file for the complete version history.
 
 See the [LICENSE](LICENSE.md) file for license rights and limitations.
 
-<!--
+
 ## How to cite
 
 Click on the DOI badge above to see instructions on how to cite the script.
 
-## Reference
--->
