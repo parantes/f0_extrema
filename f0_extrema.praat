@@ -54,14 +54,16 @@ form Extreme points in f0 contours
 	choice Mode: 1
 		button Multiple files
 		button Single file
-	sentence Pitch_path /path/to/pitch
-	sentence Grid_path /path/to/grids
+	sentence Pitch_path /path/to/pitch/
+	sentence Grid_path /path/to/grids/
 	sentence Report /path/to/report/name.txt
 	positive Smooth_(Hz) 3
 	real Median 0 (= estimate from Pitch object)
 	natural Tier 1
 	natural left_Interval_range 1
 	natural right_Interval_range 5
+	boolean Save_output 1
+	sentence Output_path path/to/files/
 endform
 
 if mode = 1
@@ -69,6 +71,9 @@ if mode = 1
 	files = Replace all: ".Pitch", "", 0, "literals"
 	nfiles = Get number of strings
 	removeObject: files_ext
+
+	# Write data to Info window
+	writeInfoLine: "file", tab$, "smooth", tab$, "median", tab$, "duration"
 else
 	nfiles = 1
 endif
@@ -203,32 +208,57 @@ for file to nfiles
 
 	# ---- Assemble output TextGrid ----
 
-	# Create TextGrid tiers: f0 and f0 velocity
-	@pointp_to_table: l_points, start, end, "L"
-	l_tab = pointp_to_table.out_tab
-	@pointp_to_table: h_points, start, end, "H"
-	h_tab = pointp_to_table.out_tab
-	@pointp_to_table: f_points, start, end, "F"
-	f_tab = pointp_to_table.out_tab
-	@pointp_to_table: r_points, start, end, "R"
-	r_tab = pointp_to_table.out_tab
-	
 	# TextGrid tiers creation
 	f0_tier = Create TextGrid: object[ome_sound].xmin, object[ome_sound].xmax, "f0", "f0"
 	f0vel_tier = Create TextGrid: object[ome_sound].xmin, object[ome_sound].xmax, "f0-velocity", "f0-velocity"
 
-	@write_ptier: l_tab, f0_tier
-	@write_ptier: h_tab, f0_tier
-	@write_ptier: f_tab, f0vel_tier
-	@write_ptier: r_tab, f0vel_tier
-
-	selectObject: grid, f0_tier, f0vel_tier
-	output_grid = Merge
-	Rename: filename$ + "_extr"
-
 	# ---- Data collection ----
 
-	selectObject: l_tab, h_tab, f_tab, r_tab
+	# Keep track of what types of extremes are found in the f0 contour
+	ntypes = 0
+
+	@pointp_to_table: l_points, start, end, "L"
+	if pointp_to_table.is_empty = 0
+		l_tab = pointp_to_table.out_tab
+		@write_ptier: l_tab, f0_tier
+		ntypes += 1
+		types_tab[ntypes] = l_tab
+	endif
+
+	@pointp_to_table: h_points, start, end, "H"
+	if pointp_to_table.is_empty = 0
+		h_tab = pointp_to_table.out_tab
+		@write_ptier: h_tab, f0_tier
+		ntypes += 1
+		types_tab[ntypes] = h_tab
+	endif
+
+	@pointp_to_table: f_points, start, end, "F"
+	if pointp_to_table.is_empty = 0
+		f_tab = pointp_to_table.out_tab
+		@write_ptier: f_tab, f0vel_tier
+		ntypes += 1
+		types_tab[ntypes] = f_tab
+	endif
+
+	@pointp_to_table: r_points, start, end, "R"
+	if pointp_to_table.is_empty = 0
+		r_tab = pointp_to_table.out_tab
+		@write_ptier: r_tab, f0vel_tier
+		ntypes += 1
+		types_tab[ntypes] = r_tab
+	endif
+
+	if ntypes < 1
+		exitScript: "There are no extreme points in file ", filename$, "."
+	endif
+
+	types_tab# = zero#(ntypes)
+	for ty to ntypes
+		types_tab#[ty] = types_tab[ty]
+	endfor
+
+	selectObject: types_tab#
 	all_tab = Append
 
 	Insert column: 1, "file"
@@ -268,6 +298,13 @@ for file to nfiles
 	Sort rows: "time"
 	Remove column: "time"
 	all_tab[file] = all_tab
+	Rename: filename$ + "_extr"
+
+	# ---- Merge f0 and f0 velocity tiers -----
+
+	selectObject: grid, f0_tier, f0vel_tier
+	output_grid = Merge
+	Rename: filename$ + "_extr"
 
 	# ---- Clean up ----
 
@@ -275,24 +312,56 @@ for file to nfiles
 	removeObject: smoothed_pitch
 	removeObject: raw_pitch, interp_pitch, mat
 	removeObject: l_points, h_points, f_points, r_points, tab
-	removeObject: l_tab, h_tab, f_tab, r_tab
+	removeObject: types_tab#
 	removeObject: f0_tier, f0vel_tier
+
+	# ---- Save output TextGrid and f0 contours ---- #
 
 	if mode = 1
 		selectObject: output_grid
 		output_grid$ = selected$("TextGrid")
 		Save as text file: grid_path$ + output_grid$ + ".TextGrid"
 		removeObject: output_grid
+		if save_output = 1
+			@sound_to_ptier: ome_sound
+			selectObject: sound_to_ptier.output
+			Save as PitchTier spreadsheet file: output_path$ + filename$ + "_f0_ome.PitchTier"
+			removeObject: sound_to_ptier.output
+
+			@sound_to_ptier: ome_vel
+			selectObject: sound_to_ptier.output
+			Save as PitchTier spreadsheet file: output_path$ + filename$ + "_f0vel_ome.PitchTier"
+			removeObject: sound_to_ptier.output
+
+			@sound_to_ptier: smoothed_sound
+			selectObject: sound_to_ptier.output
+			Save as PitchTier spreadsheet file: output_path$ + filename$ + "_f0_hz.PitchTier"
+			removeObject: sound_to_ptier.output
+
+			@sound_to_ptier: hz_vel
+			selectObject: sound_to_ptier.output
+			Save as PitchTier spreadsheet file: output_path$ + filename$ + "_f0vel_hz.PitchTier"
+			removeObject: sound_to_ptier.output
+		endif
 	else
+		# ---- Combine f0 and f0 velocity contours ----
+
 		selectObject: ome_sound, ome_vel
 		Combine to stereo
 		Rename: filename$ + "_OMe"
+		comb_ome$ = selected$("Sound")
+
 		selectObject: smoothed_sound, hz_vel
 		Combine to stereo
 		Rename: filename$ + "_hz"
-		removeObject: all_tab
+		comb_hz$ = selected$("Sound")
 	endif
 	removeObject: hz_vel, ome_vel, ome_sound, smoothed_sound
+
+	# ---- Write data to Info window ----
+	if mode = 1
+		appendInfoLine: filename$, tab$, smooth, tab$, fixed$(median_f0, 1), tab$, fixed$((end - start), 3)
+	endif
 endfor
 
 if mode = 1
@@ -306,8 +375,14 @@ if mode = 1
 		removeObject: all_tab[file]
 	endfor
 	removeObject: files, all_files
-	writeInfoLine: "Done"
-	appendInfoLine: "--"
+	appendInfoLine: newline$, "--"
+	appendInfoLine: "Run on ", date$()
+else
+	
+	writeInfoLine: "File: ", filename$
+	appendInfoLine: "Smooth: ", smooth, " Hz"
+	appendInfoLine: "Median f0: ", fixed$(median_f0, 1), " Hz"
+	appendInfoLine: newline$, "--"
 	appendInfoLine: "Run on ", date$()
 endif
 
@@ -362,11 +437,19 @@ procedure pointp_to_table: .pointp, .start, .end, .type$
 	selectObject: .pointp
 	Remove points between: object[.pointp].xmin, .start
 	Remove points between: .end, object[.pointp].xmax
-	.textt = Up to TextTier: .type$
-	.tor = Down to TableOfReal: .type$
-	.out_tab = To Table: "type"
-	Set column label (label): "Time", "time"
-	removeObject: .textt, .tor
+	# Only convert the PP object if there are extreme points
+	# within the analysis interval
+	.npoints = Get number of points
+	if .npoints > 0
+		.is_empty = 0
+		.textt = Up to TextTier: .type$
+		.tor = Down to TableOfReal: .type$
+		.out_tab = To Table: "type"
+		Set column label (label): "Time", "time"
+		removeObject: .textt, .tor
+	else
+		.is_empty = 1
+	endif
 endproc
 
 procedure write_ptier: .tab, .ptier
@@ -383,5 +466,33 @@ procedure write_ptier: .tab, .ptier
 		.time = object[.tab, .pt, 2]
 		selectObject: .ptier
 		Insert point: 1, .time, .type$
+	endfor
+endproc
+
+procedure sound_to_ptier: .input
+# Convert Sound object to PitchTier
+#
+# = Arguments =
+# .input [num]: Sound ID
+
+	# Query Sound object
+	selectObject: .input
+	.name$ = selected$("Sound")
+	.start = object[.input].xmin
+	.end = object[.input].xmax
+	.samples = object[.input].nx
+	.step = object[.input].dx
+	.time1 = Get time from sample number: 1
+
+	# Create PitchTier
+	.output = Create PitchTier: .name$, .start, .end
+
+	# Add values to PitchTier
+	.time = .time1
+	for .samp to .samples
+		.val = object[.input, 1, .samp]
+		selectObject: .output
+		Add point: .time, .val
+		.time += .step 
 	endfor
 endproc

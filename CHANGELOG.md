@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [0.9.3] - 2022-10-23
+### Fixed
+- Throw error message if no extreme points are found in the f0 contour.
+- Fixed a bug raised when no extreme point of one of the four types was found  in a contour.
+
+### Added
+- Option to save f0 and f0 velocity contours (in "multiple files" mode).
+- Print smooth value, median and duration for each file in the Praat Info window (in "multiple files mode").
+
 ## [0.9.2] - 2019-07-31
 ### Changed
 - Procedure "pointp_to_table" now uses Praat built-in functions to convert a PointProcess to a Table.
